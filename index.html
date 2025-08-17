@@ -3,22 +3,64 @@
 <head>
   <title>Free Draw</title>
   <style>
-    body { margin: 0; overflow: hidden; }
-    #auth-container {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      padding: 20px;
-      background: rgba(255, 255, 255, 0.8);
-      border-radius: 10px;
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f0f0f0;
     }
-    #drawCanvas { background: white; border: 1px solid black; }
+    #auth-container {
+      padding: 30px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+    #auth-container h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    #auth-container input {
+      display: block;
+      width: 250px;
+      padding: 10px;
+      margin: 10px auto;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    #auth-container button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #loginBtn { background-color: #4CAF50; color: white; }
+    #registerBtn { background-color: #008CBA; color: white; }
+    #drawCanvas {
+      display: none;
+      background: white;
+      border: 1px solid black;
+      cursor: crosshair;
+    }
+    #signOutBtn {
+      display: none;
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      padding: 10px 15px;
+      border: none;
+      background-color: #f44336;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
   </style>
-  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
+  <script type="module" src="./app.js"></script>
 </head>
 <body>
   <div id="auth-container">
@@ -28,8 +70,7 @@
     <button id="loginBtn">Login</button>
     <button id="registerBtn">Register</button>
   </div>
-  <canvas id="drawCanvas" style="display: none;"></canvas>
-  <button id="signOutBtn" style="display: none; position: absolute; top: 10px; right: 10px;">Sign Out</button>
-  <script src="app.js"></script>
+  <canvas id="drawCanvas"></canvas>
+  <button id="signOutBtn">Sign Out</button>
 </body>
 </html>
