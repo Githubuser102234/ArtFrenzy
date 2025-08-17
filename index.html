@@ -129,6 +129,7 @@
       border-radius: 5px;
       cursor: pointer;
       background-color: #e0e0e0;
+      font-weight: bold;
     }
     .mode-btn.active {
       background-color: #4CAF50;
@@ -138,6 +139,19 @@
       background-color: #f44336;
       color: white;
       display: none; /* Initially hidden */
+    }
+    #exitRoomBtn {
+      position: absolute;
+      top: 10px;
+      right: 110px; /* Adjust position to be next to Sign Out */
+      padding: 10px 15px;
+      border: none;
+      background-color: #ff9800;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 10;
+      display: none;
     }
   </style>
   <script type="module" src="./app.js"></script>
@@ -159,20 +173,21 @@
   <div id="canvas-container">
     <div class="toolbar">
       <div class="toolbar-item">
-        <h3>Drawing Tools</h3>
+        <button id="drawModeBtn" class="mode-btn active">Draw</button>
+        <button id="eraseModeBtn" class="mode-btn">Erase</button>
+        <button id="selectModeBtn" class="mode-btn">Select</button>
       </div>
       <div class="toolbar-item">
         <label for="color-picker">Color:</label>
         <input type="color" id="color-picker" value="#000000">
       </div>
       <div class="toolbar-item">
-        <button id="drawModeBtn" class="mode-btn active">Draw</button>
-        <button id="selectModeBtn" class="mode-btn">Select</button>
         <button id="deleteBtn">Delete Selected</button>
       </div>
     </div>
     <canvas id="drawCanvas"></canvas>
   </div>
+  <button id="exitRoomBtn">Exit Room</button>
   <button id="signOutBtn">Sign Out</button>
 </body>
 </html>
