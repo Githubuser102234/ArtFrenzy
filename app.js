@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+import { getDatabase, ref, push, onChildAdded, onValue, remove } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -28,6 +28,9 @@ const loginBtn = document.getElementById('loginBtn');
 const registerBtn = document.getElementById('registerBtn');
 const createRoomBtn = document.getElementById('createRoomBtn');
 const signOutBtn = document.getElementById('signOutBtn');
+const drawModeBtn = document.getElementById('drawModeBtn');
+const selectModeBtn = document.getElementById('selectModeBtn');
+const deleteBtn = document.getElementById('deleteBtn');
 
 const canvasContainer = document.getElementById('canvas-container');
 const canvas = document.getElementById('drawCanvas');
@@ -38,6 +41,10 @@ let drawing = false;
 let lastX = 0;
 let lastY = 0;
 let userColor = '#000000';
+let currentMode = 'draw';
+let roomRef;
+let allLines = {};
+let selectedLineKey = null;
 
 // Event listeners for auth buttons
 loginBtn.addEventListener('click', () => {
@@ -64,6 +71,35 @@ createRoomBtn.addEventListener('click', () => {
   const currentUrl = new URL(window.location.href);
   const newUrl = `${currentUrl.origin}${currentUrl.pathname}?roomid=${newRoomId}`;
   window.location.href = newUrl;
+});
+
+// Mode buttons
+drawModeBtn.addEventListener('click', () => {
+  currentMode = 'draw';
+  drawModeBtn.classList.add('active');
+  selectModeBtn.classList.remove('active');
+  deleteBtn.style.display = 'none';
+  selectedLineKey = null;
+  redrawCanvas();
+});
+
+selectModeBtn.addEventListener('click', () => {
+  currentMode = 'select';
+  selectModeBtn.classList.add('active');
+  drawModeBtn.classList.remove('active');
+});
+
+deleteBtn.addEventListener('click', () => {
+  if (selectedLineKey) {
+    const lineToDeleteRef = ref(database, 'rooms/' + roomRef.key + '/' + selectedLineKey);
+    remove(lineToDeleteRef).then(() => {
+      console.log("Line deleted successfully.");
+      selectedLineKey = null;
+      deleteBtn.style.display = 'none';
+    }).catch((error) => {
+      console.error("Error removing line: ", error);
+    });
+  }
 });
 
 // Update the user's color when the color picker changes
@@ -98,7 +134,7 @@ onAuthStateChanged(auth, user => {
 
 // The drawing app logic
 function startDrawingApp(roomId) {
-  const roomRef = ref(database, 'rooms/' + roomId);
+  roomRef = ref(database, 'rooms/' + roomId);
 
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -107,17 +143,39 @@ function startDrawingApp(roomId) {
   ctx.lineJoin = 'round';
   ctx.lineWidth = 2;
 
-  canvas.addEventListener('mousedown', startDrawing);
-  canvas.addEventListener('mouseup', stopDrawing);
-  canvas.addEventListener('mouseout', stopDrawing);
-  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mousedown', handleInteractionStart);
+  canvas.addEventListener('mouseup', handleInteractionEnd);
+  canvas.addEventListener('mouseout', handleInteractionEnd);
+  canvas.addEventListener('mousemove', handleInteractionMove);
 
   // Mobile touch events
-  canvas.addEventListener('touchstart', startDrawing);
-  canvas.addEventListener('touchend', stopDrawing);
-  canvas.addEventListener('touchcancel', stopDrawing);
-  canvas.addEventListener('touchmove', draw);
+  canvas.addEventListener('touchstart', handleInteractionStart);
+  canvas.addEventListener('touchend', handleInteractionEnd);
+  canvas.addEventListener('touchcancel', handleInteractionEnd);
+  canvas.addEventListener('touchmove', handleInteractionMove);
 
+  function handleInteractionStart(e) {
+    e.preventDefault();
+    if (currentMode === 'draw') {
+      startDrawing(e);
+    } else if (currentMode === 'select') {
+      selectLine(e);
+    }
+  }
+
+  function handleInteractionEnd(e) {
+    if (currentMode === 'draw') {
+      stopDrawing();
+    }
+  }
+
+  function handleInteractionMove(e) {
+    e.preventDefault();
+    if (currentMode === 'draw') {
+      draw(e);
+    }
+  }
+  
   function sendLine(x1, y1, x2, y2, color) {
     push(roomRef, {
       x1: x1,
@@ -134,6 +192,23 @@ function startDrawingApp(roomId) {
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
+  }
+  
+  function redrawCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const key in allLines) {
+      const line = allLines[key];
+      let color = line.color;
+      if (key === selectedLineKey) {
+        // Highlight selected line
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 4;
+      } else {
+        ctx.strokeStyle = line.color;
+        ctx.lineWidth = 2;
+      }
+      drawLine(line.x1, line.y1, line.x2, line.y2, color);
+    }
   }
 
   function getCanvasCoordinates(e) {
@@ -153,13 +228,10 @@ function startDrawingApp(roomId) {
   }
 
   function startDrawing(e) {
-    e.preventDefault();
     drawing = true;
     const coords = getCanvasCoordinates(e);
     lastX = coords.x;
     lastY = coords.y;
-    // Draw an initial dot on mouse down
-    drawLine(lastX, lastY, lastX, lastY, userColor);
     sendLine(lastX, lastY, lastX, lastY, userColor);
   }
 
@@ -168,22 +240,39 @@ function startDrawingApp(roomId) {
   }
 
   function draw(e) {
-    e.preventDefault();
     if (!drawing) return;
     const coords = getCanvasCoordinates(e);
-    // Draw the line on the canvas immediately for a responsive feel
-    drawLine(lastX, lastY, coords.x, coords.y, userColor);
-    // Send the line data to Firebase
     sendLine(lastX, lastY, coords.x, coords.y, userColor);
-    // Update the last position
     lastX = coords.x;
     lastY = coords.y;
   }
 
-  // Listen for new lines from Firebase
-  onChildAdded(roomRef, snapshot => {
-    const line = snapshot.val();
-    // This is the key part - we draw the line using the received data
-    drawLine(line.x1, line.y1, line.x2, line.y2, line.color);
+  function selectLine(e) {
+    const coords = getCanvasCoordinates(e);
+    let found = false;
+    for (const key in allLines) {
+      const line = allLines[key];
+      // Simple distance check to see if we clicked near a line segment
+      const dist1 = Math.sqrt(Math.pow(coords.x - line.x1, 2) + Math.pow(coords.y - line.y1, 2));
+      const dist2 = Math.sqrt(Math.pow(coords.x - line.x2, 2) + Math.pow(coords.y - line.y2, 2));
+      if (dist1 < 10 || dist2 < 10) { // 10 is the selection tolerance
+        selectedLineKey = key;
+        deleteBtn.style.display = 'block';
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      selectedLineKey = null;
+      deleteBtn.style.display = 'none';
+    }
+    redrawCanvas();
+  }
+
+  // Listen for all lines from Firebase and redraw the canvas
+  onValue(roomRef, (snapshot) => {
+    allLines = snapshot.val() || {};
+    redrawCanvas();
   });
 }
+
