@@ -81,12 +81,22 @@
       transform: translateX(-50%);
       padding: 10px;
       background: rgba(255, 255, 255, 0.8);
-      border-radius: 5px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 15px;
       z-index: 10;
+      flex-wrap: wrap;
+    }
+    .toolbar h3 {
+      margin: 0;
+      font-size: 1em;
+    }
+    .toolbar-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
     #color-picker {
       -webkit-appearance: none;
@@ -113,6 +123,22 @@
       cursor: pointer;
       z-index: 10;
     }
+    .mode-btn {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background-color: #e0e0e0;
+    }
+    .mode-btn.active {
+      background-color: #4CAF50;
+      color: white;
+    }
+    #deleteBtn {
+      background-color: #f44336;
+      color: white;
+      display: none; /* Initially hidden */
+    }
   </style>
   <script type="module" src="./app.js"></script>
 </head>
@@ -132,8 +158,18 @@
   
   <div id="canvas-container">
     <div class="toolbar">
-      <label for="color-picker">Color:</label>
-      <input type="color" id="color-picker" value="#000000">
+      <div class="toolbar-item">
+        <h3>Drawing Tools</h3>
+      </div>
+      <div class="toolbar-item">
+        <label for="color-picker">Color:</label>
+        <input type="color" id="color-picker" value="#000000">
+      </div>
+      <div class="toolbar-item">
+        <button id="drawModeBtn" class="mode-btn active">Draw</button>
+        <button id="selectModeBtn" class="mode-btn">Select</button>
+        <button id="deleteBtn">Delete Selected</button>
+      </div>
     </div>
     <canvas id="drawCanvas"></canvas>
   </div>
