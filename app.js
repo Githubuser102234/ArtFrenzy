@@ -26,10 +26,14 @@ const passwordInput = document.getElementById('password');
 const loginBtn = document.getElementById('loginBtn');
 const registerBtn = document.getElementById('registerBtn');
 const signOutBtn = document.getElementById('signOutBtn');
+
+const canvasContainer = document.getElementById('canvas-container');
 const canvas = document.getElementById('drawCanvas');
 const ctx = canvas.getContext('2d');
+const colorPicker = document.getElementById('color-picker');
 
 let drawing = false;
+let userColor = '#000000';
 
 // Event listeners for auth buttons
 loginBtn.addEventListener('click', () => {
@@ -50,16 +54,21 @@ signOutBtn.addEventListener('click', () => {
   signOut(auth);
 });
 
+// Update the user's color when the color picker changes
+colorPicker.addEventListener('change', (e) => {
+  userColor = e.target.value;
+});
+
 // Main logic for handling authentication state changes
 onAuthStateChanged(auth, user => {
   if (user) {
     authContainer.style.display = 'none';
-    canvas.style.display = 'block';
+    canvasContainer.style.display = 'block';
     signOutBtn.style.display = 'block';
     startDrawingApp();
   } else {
     authContainer.style.display = 'flex';
-    canvas.style.display = 'none';
+    canvasContainer.style.display = 'none';
     signOutBtn.style.display = 'none';
   }
 });
@@ -69,9 +78,11 @@ function startDrawingApp() {
   const urlParams = new URLSearchParams(window.location.search);
   const roomId = urlParams.get('roomid');
 
+  // Redirection Logic
+  const githubPageUrl = 'https://githubuser102234.github.io/ArtFrenzy/';
   if (!roomId) {
     const newRoomId = Math.random().toString(36).substring(2, 9);
-    window.location.href = `/?roomid=${newRoomId}`;
+    window.location.href = `${githubPageUrl}?roomid=${newRoomId}`;
     return;
   }
   
@@ -82,28 +93,45 @@ function startDrawingApp() {
 
   canvas.addEventListener('mousedown', startDrawing);
   canvas.addEventListener('mouseup', stopDrawing);
+  canvas.addEventListener('mouseout', stopDrawing); // Stop drawing if mouse leaves canvas
   canvas.addEventListener('mousemove', draw);
+  
+  // Mobile touch events
+  canvas.addEventListener('touchstart', startDrawing);
+  canvas.addEventListener('touchend', stopDrawing);
+  canvas.addEventListener('touchcancel', stopDrawing);
+  canvas.addEventListener('touchmove', draw);
 
-  function sendLine(x1, y1, x2, y2) {
+  function sendLine(x1, y1, x2, y2, color) {
     push(roomRef, {
       x1: x1,
       y1: y1,
       x2: x2,
-      y2: y2
+      y2: y2,
+      color: color
     });
   }
 
-  function drawLine(x1, y1, x2, y2) {
+  function drawLine(x1, y1, x2, y2, color) {
+    ctx.strokeStyle = color;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
   }
 
+  function getClientCoordinates(e) {
+    if (e.touches && e.touches.length > 0) {
+      return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
+    }
+    return { clientX: e.clientX, clientY: e.clientY };
+  }
+
   function startDrawing(e) {
+    e.preventDefault(); // Prevents mobile scrolling while drawing
     drawing = true;
-    const { clientX, clientY } = e;
-    drawLine(clientX, clientY, clientX, clientY);
+    const { clientX, clientY } = getClientCoordinates(e);
+    drawLine(clientX, clientY, clientX, clientY, userColor);
   }
 
   function stopDrawing() {
@@ -111,16 +139,18 @@ function startDrawingApp() {
   }
 
   function draw(e) {
+    e.preventDefault();
     if (!drawing) return;
-    const { clientX, clientY } = e;
-    const lastX = e.offsetX - e.movementX;
-    const lastY = e.offsetY - e.movementY;
-    sendLine(lastX, lastY, clientX, clientY);
-    drawLine(lastX, lastY, clientX, clientY);
+    const { clientX, clientY } = getClientCoordinates(e);
+    const lastX = e.offsetX - (e.movementX || 0); // movementX is not available on touch events
+    const lastY = e.offsetY - (e.movementY || 0);
+    sendLine(lastX, lastY, clientX, clientY, userColor);
+    drawLine(lastX, lastY, clientX, clientY, userColor);
   }
-
+  
+  // Listen for new lines from Firebase
   onChildAdded(roomRef, snapshot => {
     const line = snapshot.val();
-    drawLine(line.x1, line.y1, line.x2, line.y2);
+    drawLine(line.x1, line.y1, line.x2, line.y2, line.color);
   });
 }
