@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Advanced HTML Viewer & Live Preview</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/css/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/htmlmixed/htmlmixed.min.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.5/split.min.js"></script>
+
+  <script type="module">
+    // Firebase is initialized lower in the file (after markup), inside another <script type="module"> block.
+  </script>
+
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --border: #2a2f3a;
+      --text: #e6e6e6;
+      --muted: #9aa3b2;
+      --accent: #6aa1ff;
+      --danger: #ff6a6a;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell,
+        'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+    }
+
+    header {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .75rem 1rem; border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 10;
+    }
+    header h1 {
+      font-size: 1rem; font-weight: 600; margin: 0; letter-spacing: .2px; color: var(--muted);
+    }
+    .spacer { flex: 1; }
+
+    .btn {
+      background: var(--panel); color: var(--text); border: 1px solid var(--border);
+      padding: .5rem .75rem; border-radius: .5rem; cursor: pointer; font-size: .9rem;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn-danger:hover { border-color: var(--danger); }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+
+    .toolbar { display: flex; gap: .5rem; align-items: center; }
+    .file-input { display: none; }
+
+    .panes {
+      position: fixed; top: 48px; bottom: 0; left: 0; right: 0;
+      display: flex; gap: 0;
+    }
+    .gutter {
+      background: var(--panel); cursor: col-resize; width: 6px !important;
+      border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+    }
+
+    .pane { height: 100%; overflow: hidden; }
+    .editor-pane { background: var(--panel); border-right: 1px solid var(--border); }
+    .preview-pane { background: #0b0d11; }
+
+    .CodeMirror {
+      height: 100%;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 14px;
+      background: transparent;
+      color: var(--text);
+    }
+
+    .statusbar {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 28px;
+      display: flex; align-items: center; gap: .75rem; padding: 0 .75rem;
+      background: rgba(0,0,0,.35); border-top: 1px solid var(--border);
+      font-size: .85rem; color: var(--muted);
+    }
+    .badge { padding: .1rem .4rem; border: 1px solid var(--border); border-radius: .35rem; }
+    .blink { animation: blink 1.2s linear infinite; }
+    @keyframes blink { 50% { opacity: 0.4; } }
+
+    /* Viewer mode (when ?sessionid= is present) */
+    .viewer-root, .viewer-iframe { height: 100vh; width: 100vw; border: 0; }
+    .viewer-msg {
+      display: grid; place-items: center; height: 100vh; text-align: center; padding: 2rem;
+    }
+    .link {
+      color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent);
+    }
+
+    @media (max-width: 900px) {
+      header { flex-wrap: wrap; gap: .75rem; }
+      .toolbar { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header id="appHeader">
+    <h1>Advanced HTML Viewer</h1>
+    <span class="spacer"></span>
+
+    <div class="toolbar" id="editorToolbar">
+      <button class="btn" id="btnNew">New</button>
+      <label class="btn" for="fileInput">Import .html</label>
+      <input type="file" accept=".html,.htm,text/html" id="fileInput" class="file-input" />
+      <button class="btn" id="btnDownload">Save as .html</button>
+      <button class="btn" id="btnCopyLink" title="Create & copy a 1-hour fullscreen link">Copy Fullscreen Link</button>
+      <button class="btn" id="btnOpenLink" title="Open the 1-hour fullscreen link in a new tab">Open Fullscreen</button>
+      <button class="btn" id="btnDark">Dark/Light</button>
+    </div>
+  </header>
+
+  <div class="panes" id="panes" style="display:none;">
+    <div class="pane editor-pane" id="editorPane">
+      <textarea id="editor"></textarea>
+    </div>
+    <div class="pane preview-pane" id="previewPane">
+      <iframe id="preview" title="Live Preview" style="border:0; width:100%; height:100%;"></iframe>
+    </div>
+  </div>
+
+  <div class="statusbar" id="statusbar" style="display:none;">
+    <span id="statMsg">Ready</span>
+    <span class="badge" id="statSaved">autosave</span>
+    <span class="badge" id="statLength">0 chars</span>
+  </div>
+
+  <div id="viewerContainer" style="display:none;">
+    <iframe id="viewerIframe" class="viewer-iframe"></iframe>
+  </div>
+  <div id="viewerMessage" class="viewer-msg" style="display:none;"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+    import {
+      getFirestore, doc, setDoc, getDoc, deleteDoc,
+      serverTimestamp, Timestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+
+    // ---------- FIREBASE INIT ----------
+    const firebaseConfig = {
+      // TODO: paste YOUR Firebase config here:
+      apiKey: "AIzaSyB2BN4GfU6AMJbYFWTJNZSgqqJBB6n6Wck",
+      authDomain: "htmlviewer-26aca.firebaseapp.com",
+      projectId: "htmlviewer-26aca",
+      storageBucket: "htmlviewer-26aca.firebasestorage.app",
+      messagingSenderId: "882448035361",
+      appId: "1:882448035361:web:4bfb1fc38df123d9627d60",
+      measurementId: "G-17GRVFT84G"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // ---------- DOM ----------
+    const q = sel => document.querySelector(sel);
+    const panesEl = q('#panes');
+    const statusbarEl = q('#statusbar');
+    const headerEl = q('#appHeader');
+    const editorToolbarEl = q('#editorToolbar');
+
+    const btnNew = q('#btnNew');
+    const btnDownload = q('#btnDownload');
+    const btnCopyLink = q('#btnCopyLink');
+    const btnOpenLink = q('#btnOpenLink');
+    const btnDark = q('#btnDark');
+    const fileInput = q('#fileInput');
+
+    const statMsg = q('#statMsg');
+    const statSaved = q('#statSaved');
+    const statLen = q('#statLength');
+
+    const previewFrame = q('#preview');
+
+    const viewerContainer = q('#viewerContainer');
+    const viewerIframe = q('#viewerIframe');
+    const viewerMessage = q('#viewerMessage');
+
+    // ---------- MODE DETECTION ----------
+    const params = new URLSearchParams(location.search);
+    const sessionId = params.get('sessionid');
+
+    // ---------- EDITOR / VIEWER MODE ----------
+    if (sessionId) {
+      // VIEWER MODE
+      headerEl.style.display = 'none';
+      statusbarEl.style.display = 'none';
+      panesEl.style.display = 'none';
+      editorToolbarEl.style.display = 'none';
+      runViewerMode(sessionId);
+    } else {
+      // EDITOR MODE
+      panesEl.style.display = 'flex';
+      statusbarEl.style.display = 'flex';
+      runEditorMode();
+    }
+
+    // ---------- EDITOR MODE IMPLEMENTATION ----------
+    let cm, saveTimer, previewTimer;
+
+    function runEditorMode() {
+      // Split panes
+      Split(['#editorPane', '#previewPane'], { sizes: [50, 50], minSize: [200, 200], gutterSize: 6 });
+
+      // Create CodeMirror editor
+      cm = CodeMirror.fromTextArea(document.getElementById('editor'), {
+        mode: 'htmlmixed',
+        theme: 'material-darker',
+        lineNumbers: true,
+        lineWrapping: true,
+        tabSize: 2,
+        indentUnit: 2,
+        autoCloseTags: true
+      });
+
+      // Load last autosave
+      const saved = localStorage.getItem('advanced_html_viewer');
+      const initial = saved || `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Hello</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: system-ui, sans-serif; padding: 2rem; }
+      h1 { margin: 0 0 1rem; }
+      .box { padding: 1rem; border: 2px dashed #999; border-radius: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>👋 Live Preview</h1>
+    <div class="box">Edit the HTML on the left. Changes show instantly here.</div>
+  </body>
+</html>`;
+      cm.setValue(initial);
+      updatePreview(initial);
+      updateLengthBadge(initial.length);
+
+      cm.on('change', () => {
+        const val = cm.getValue();
+        // Debounced autosave
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          localStorage.setItem('advanced_html_viewer', val);
+          statSaved.textContent = 'autosaved';
+          statSaved.classList.remove('blink');
+        }, 300);
+
+        // Live preview debounce
+        clearTimeout(previewTimer);
+        previewTimer = setTimeout(() => updatePreview(val), 120);
+
+        statSaved.textContent = 'editing…';
+        statSaved.classList.add('blink');
+        updateLengthBadge(val.length);
+      });
+
+      // Buttons
+      btnNew.addEventListener('click', () => {
+        if (confirm('Clear the editor? Unsaved changes will be lost.')) {
+          cm.setValue('<!doctype html>\n<html>\n  <head>\n    <meta charset="utf-8" />\n    <title>New</title>\n  </head>\n  <body>\n    <h1>New Document</h1>\n  </body>\n</html>');
+        }
+      });
+
+      btnDownload.addEventListener('click', () => {
+        const html = cm.getValue();
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (documentTitleFrom(html) || 'document') + '.html';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        stat('Downloaded .html');
+      });
+
+      btnCopyLink.addEventListener('click', async () => {
+        try {
+          const link = await createSessionAndLink(cm.getValue());
+          await navigator.clipboard.writeText(link);
+          stat('Fullscreen link copied to clipboard');
+        } catch (e) {
+          console.error(e);
+          stat('Failed to copy link');
+        }
+      });
+
+      btnOpenLink.addEventListener('click', async () => {
+        try {
+          const link = await createSessionAndLink(cm.getValue());
+          window.open(link, '_blank', 'noopener,noreferrer');
+          stat('Opened fullscreen');
+        } catch (e) {
+          console.error(e);
+          stat('Failed to open fullscreen');
+        }
+      });
+
+      btnDark.addEventListener('click', () => {
+        document.documentElement.classList.toggle('light');
+        // You can expand this to fully theme swap if you like
+      });
+
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => cm.setValue(String(reader.result || ''));
+        reader.readAsText(file);
+        fileInput.value = '';
+      });
+    }
+
+    function stat(msg) {
+      statMsg.textContent = msg;
+      setTimeout(() => (statMsg.textContent = 'Ready'), 2200);
+    }
+
+    function updateLengthBadge(n) {
+      statLen.textContent = `${n.toLocaleString()} chars`;
+    }
+
+    function documentTitleFrom(html) {
+      const m = /<title>([\s\S]*?)<\/title>/i.exec(html);
+      return m ? m[1].trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 64) : '';
+    }
+
+    function updatePreview(html) {
+      const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+      doc.open();
+      doc.write(html);
+      doc.close();
+    }
+
+    // ---------- SESSION CREATION (1-hour) ----------
+    async function createSessionAndLink(html) {
+      const id = crypto.randomUUID();
+      const nowMs = Date.now();
+      const expiresAt = Timestamp.fromMillis(nowMs + 60 * 60 * 1000); // +1 hour
+      const createdAt = serverTimestamp();
+
+      await setDoc(doc(db, 'sessions', id), {
+        html,
+        createdAt,
+        expiresAt,         // used by Security Rules and TTL
+        length: html.length
+      });
+
+      const url = new URL(location.href);
+      url.search = `?sessionid=${encodeURIComponent(id)}`;
+      return url.toString();
+    }
+
+    // ---------- VIEWER MODE IMPLEMENTATION ----------
+    async function runViewerMode(id) {
+      try {
+        const ref = doc(db, 'sessions', id);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          showViewerMessage(`This link is invalid or has been deleted. <br><br><a class="link" href="${location.pathname}">Go back to the editor</a>`);
+          return;
+        }
+
+        const data = snap.data();
+        const now = Date.now();
+        const expMs = data.expiresAt?.toMillis?.() ?? 0;
+
+        if (!expMs || now > expMs) {
+          // Try cleanup if still there
+          try { await deleteDoc(ref); } catch {}
+          showViewerMessage(`This link has expired. <br><br><a class="link" href="${location.pathname}">Create a new one</a>`);
+          return;
+        }
+
+        // Render into fullscreen iframe
+        viewerContainer.style.display = 'block';
+        const html = String(data.html || '');
+        const doc = viewerIframe.contentDocument || viewerIframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+
+        // Optionally delete right after it expires (client-side safety net)
+        setTimeout(async () => {
+          try { await deleteDoc(ref); } catch {}
+        }, Math.max(0, expMs - now));
+
+      } catch (e) {
+        console.error(e);
+        showViewerMessage(`Failed to load session. <br><br><a class="link" href="${location.pathname}">Try again</a>`);
+      }
+    }
+
+    function showViewerMessage(html) {
+      viewerMessage.style.display = 'grid';
+      viewerMessage.innerHTML = html;
+    }
+  </script>
+
+  <style>
+    .light {
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --border: #e5e7eb;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #2563eb;
+      --danger: #dc2626;
+    }
+    .light .preview-pane { background: #ffffff; }
+  </style>
+</body>
+</html>
