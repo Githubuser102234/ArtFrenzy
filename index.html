@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <title>Advanced HTML Viewer & Live Preview</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- CodeMirror 5 (syntax highlighting for HTML/CSS/JS) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/material-darker.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
@@ -12,8 +13,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/css/css.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/htmlmixed/htmlmixed.min.js"></script>
 
+  <!-- Split.js to make the panes resizable -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.5/split.min.js"></script>
 
+  <!-- Firebase (modular v10) -->
   <script type="module">
     // Firebase is initialized lower in the file (after markup), inside another <script type="module"> block.
   </script>
@@ -121,6 +124,7 @@
     </div>
   </header>
 
+  <!-- Split panes -->
   <div class="panes" id="panes" style="display:none;">
     <div class="pane editor-pane" id="editorPane">
       <textarea id="editor"></textarea>
@@ -130,17 +134,20 @@
     </div>
   </div>
 
+  <!-- Status bar -->
   <div class="statusbar" id="statusbar" style="display:none;">
     <span id="statMsg">Ready</span>
     <span class="badge" id="statSaved">autosave</span>
     <span class="badge" id="statLength">0 chars</span>
   </div>
 
+  <!-- Viewer containers (shown only in viewer mode) -->
   <div id="viewerContainer" style="display:none;">
     <iframe id="viewerIframe" class="viewer-iframe"></iframe>
   </div>
   <div id="viewerMessage" class="viewer-msg" style="display:none;"></div>
 
+  <!-- Main app script -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
     import {
@@ -151,13 +158,12 @@
     // ---------- FIREBASE INIT ----------
     const firebaseConfig = {
       // TODO: paste YOUR Firebase config here:
-      apiKey: "AIzaSyB2BN4GfU6AMJbYFWTJNZSgqqJBB6n6Wck",
-      authDomain: "htmlviewer-26aca.firebaseapp.com",
-      projectId: "htmlviewer-26aca",
-      storageBucket: "htmlviewer-26aca.firebasestorage.app",
-      messagingSenderId: "882448035361",
-      appId: "1:882448035361:web:4bfb1fc38df123d9627d60",
-      measurementId: "G-17GRVFT84G"
+      // apiKey: "YOUR_KEY",
+      // authDomain: "YOUR_DOMAIN",
+      // projectId: "YOUR_PROJECT_ID",
+      // storageBucket: "YOUR_BUCKET",
+      // messagingSenderId: "YOUR_SENDER_ID",
+      // appId: "YOUR_APP_ID"
     };
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
@@ -406,6 +412,7 @@
     }
   </script>
 
+  <!-- Optional: very light “light mode” example -->
   <style>
     .light {
       --bg: #f8fafc;
