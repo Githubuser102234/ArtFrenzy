@@ -156,6 +156,19 @@
       display: none;
       z-index: 20;
     }
+    /* New styles for better mobile UI */
+    .room-selection-content {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+    }
+    .room-selection-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
   </style>
   <script type="module" src="./app.js"></script>
 </head>
@@ -169,8 +182,13 @@
   </div>
   
   <div id="room-selection-container">
-    <h2>Welcome to ArtFrenzy!</h2>
-    <button id="createRoomBtn">🎨 Create a New Room</button>
+    <div class="room-selection-content">
+      <h2>Welcome to ArtFrenzy!</h2>
+      <div class="room-selection-buttons">
+        <button id="createRoomBtn">🎨 Create a New Room</button>
+        <button id="signOutBtn" class="action-btn">Sign Out</button>
+      </div>
+    </div>
   </div>
   
   <div id="canvas-container">
@@ -200,4 +218,3 @@
   </div>
 </body>
 </html>
-
