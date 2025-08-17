@@ -74,11 +74,19 @@
       width: 100%;
       height: 100%;
     }
-    .toolbar {
+    .header-container {
       position: absolute;
       top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
+      left: 10px;
+      right: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      z-index: 10;
+    }
+    .toolbar {
       padding: 10px;
       background: rgba(255, 255, 255, 0.8);
       border-radius: 10px;
@@ -86,17 +94,16 @@
       display: flex;
       align-items: center;
       gap: 15px;
-      z-index: 10;
       flex-wrap: wrap;
-    }
-    .toolbar h3 {
-      margin: 0;
-      font-size: 1em;
     }
     .toolbar-item {
       display: flex;
       align-items: center;
       gap: 5px;
+    }
+    .top-right-buttons {
+      display: flex;
+      gap: 10px;
     }
     #color-picker {
       -webkit-appearance: none;
@@ -111,17 +118,18 @@
     }
     #color-picker::-webkit-color-swatch-wrapper { padding: 0; }
     #color-picker::-webkit-color-swatch { border: 1px solid #000; border-radius: 3px; }
-    #signOutBtn {
-      position: absolute;
-      top: 10px;
-      right: 10px;
+    .action-btn {
       padding: 10px 15px;
       border: none;
-      background-color: #f44336;
-      color: white;
       border-radius: 5px;
       cursor: pointer;
-      z-index: 10;
+      color: white;
+    }
+    #signOutBtn {
+      background-color: #f44336;
+    }
+    #exitRoomBtn {
+      background-color: #ff9800;
     }
     .mode-btn {
       padding: 8px 12px;
@@ -138,20 +146,15 @@
     #deleteBtn {
       background-color: #f44336;
       color: white;
-      display: none; /* Initially hidden */
-    }
-    #exitRoomBtn {
-      position: absolute;
-      top: 10px;
-      right: 110px; /* Adjust position to be next to Sign Out */
-      padding: 10px 15px;
-      border: none;
-      background-color: #ff9800;
-      color: white;
-      border-radius: 5px;
-      cursor: pointer;
-      z-index: 10;
       display: none;
+    }
+    #textInput {
+      position: absolute;
+      padding: 5px;
+      border: 1px solid #333;
+      background: rgba(255, 255, 255, 0.9);
+      display: none;
+      z-index: 20;
     }
   </style>
   <script type="module" src="./app.js"></script>
@@ -171,23 +174,29 @@
   </div>
   
   <div id="canvas-container">
-    <div class="toolbar">
-      <div class="toolbar-item">
-        <button id="drawModeBtn" class="mode-btn active">Draw</button>
-        <button id="eraseModeBtn" class="mode-btn">Erase</button>
-        <button id="selectModeBtn" class="mode-btn">Select</button>
+    <div class="header-container">
+      <div class="toolbar">
+        <div class="toolbar-item">
+          <button id="drawModeBtn" class="mode-btn active">Draw</button>
+          <button id="eraseModeBtn" class="mode-btn">Erase</button>
+          <button id="selectModeBtn" class="mode-btn">Select</button>
+          <button id="addTextModeBtn" class="mode-btn">Add Text</button>
+        </div>
+        <div class="toolbar-item">
+          <label for="color-picker">Color:</label>
+          <input type="color" id="color-picker" value="#000000">
+        </div>
+        <div class="toolbar-item">
+          <button id="deleteBtn">Delete Selected</button>
+        </div>
       </div>
-      <div class="toolbar-item">
-        <label for="color-picker">Color:</label>
-        <input type="color" id="color-picker" value="#000000">
-      </div>
-      <div class="toolbar-item">
-        <button id="deleteBtn">Delete Selected</button>
+      <div class="top-right-buttons">
+        <button id="exitRoomBtn" class="action-btn">Exit Room</button>
+        <button id="signOutBtn" class="action-btn">Sign Out</button>
       </div>
     </div>
     <canvas id="drawCanvas"></canvas>
+    <input type="text" id="textInput" placeholder="Enter text...">
   </div>
-  <button id="exitRoomBtn">Exit Room</button>
-  <button id="signOutBtn">Sign Out</button>
 </body>
 </html>
