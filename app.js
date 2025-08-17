@@ -28,7 +28,9 @@ const loginBtn = document.getElementById('loginBtn');
 const registerBtn = document.getElementById('registerBtn');
 const createRoomBtn = document.getElementById('createRoomBtn');
 const signOutBtn = document.getElementById('signOutBtn');
+const exitRoomBtn = document.getElementById('exitRoomBtn');
 const drawModeBtn = document.getElementById('drawModeBtn');
+const eraseModeBtn = document.getElementById('eraseModeBtn');
 const selectModeBtn = document.getElementById('selectModeBtn');
 const deleteBtn = document.getElementById('deleteBtn');
 
@@ -65,6 +67,11 @@ signOutBtn.addEventListener('click', () => {
   signOut(auth);
 });
 
+exitRoomBtn.addEventListener('click', () => {
+  // Redirect to the main page without the room ID
+  window.location.href = window.location.origin + window.location.pathname;
+});
+
 // Event listener for the new "Create Room" button
 createRoomBtn.addEventListener('click', () => {
   const newRoomId = Math.random().toString(36).substring(2, 9);
@@ -76,17 +83,21 @@ createRoomBtn.addEventListener('click', () => {
 // Mode buttons
 drawModeBtn.addEventListener('click', () => {
   currentMode = 'draw';
-  drawModeBtn.classList.add('active');
-  selectModeBtn.classList.remove('active');
-  deleteBtn.style.display = 'none';
+  toggleModeButtons('draw');
+  selectedLineKey = null;
+  redrawCanvas();
+});
+
+eraseModeBtn.addEventListener('click', () => {
+  currentMode = 'erase';
+  toggleModeButtons('erase');
   selectedLineKey = null;
   redrawCanvas();
 });
 
 selectModeBtn.addEventListener('click', () => {
   currentMode = 'select';
-  selectModeBtn.classList.add('active');
-  drawModeBtn.classList.remove('active');
+  toggleModeButtons('select');
 });
 
 deleteBtn.addEventListener('click', () => {
@@ -107,6 +118,24 @@ colorPicker.addEventListener('change', (e) => {
   userColor = e.target.value;
 });
 
+function toggleModeButtons(activeMode) {
+  const buttons = [drawModeBtn, eraseModeBtn, selectModeBtn];
+  buttons.forEach(btn => btn.classList.remove('active'));
+  
+  if (activeMode === 'draw') {
+    drawModeBtn.classList.add('active');
+    deleteBtn.style.display = 'none';
+    canvas.style.cursor = 'crosshair';
+  } else if (activeMode === 'erase') {
+    eraseModeBtn.classList.add('active');
+    deleteBtn.style.display = 'none';
+    canvas.style.cursor = 'crosshair';
+  } else if (activeMode === 'select') {
+    selectModeBtn.classList.add('active');
+    canvas.style.cursor = 'pointer';
+  }
+}
+
 // Main logic for handling authentication state changes
 onAuthStateChanged(auth, user => {
   if (user) {
@@ -119,16 +148,19 @@ onAuthStateChanged(auth, user => {
     if (roomId) {
       roomSelectionContainer.style.display = 'none';
       canvasContainer.style.display = 'block';
+      exitRoomBtn.style.display = 'block';
       startDrawingApp(roomId);
     } else {
       roomSelectionContainer.style.display = 'flex';
       canvasContainer.style.display = 'none';
+      exitRoomBtn.style.display = 'none';
     }
   } else {
     authContainer.style.display = 'flex';
     roomSelectionContainer.style.display = 'none';
     canvasContainer.style.display = 'none';
     signOutBtn.style.display = 'none';
+    exitRoomBtn.style.display = 'none';
   }
 });
 
@@ -156,7 +188,7 @@ function startDrawingApp(roomId) {
 
   function handleInteractionStart(e) {
     e.preventDefault();
-    if (currentMode === 'draw') {
+    if (currentMode === 'draw' || currentMode === 'erase') {
       startDrawing(e);
     } else if (currentMode === 'select') {
       selectLine(e);
@@ -164,30 +196,32 @@ function startDrawingApp(roomId) {
   }
 
   function handleInteractionEnd(e) {
-    if (currentMode === 'draw') {
+    if (currentMode === 'draw' || currentMode === 'erase') {
       stopDrawing();
     }
   }
 
   function handleInteractionMove(e) {
     e.preventDefault();
-    if (currentMode === 'draw') {
+    if (currentMode === 'draw' || currentMode === 'erase') {
       draw(e);
     }
   }
   
-  function sendLine(x1, y1, x2, y2, color) {
+  function sendLine(x1, y1, x2, y2, color, lineWidth) {
     push(roomRef, {
       x1: x1,
       y1: y1,
       x2: x2,
       y2: y2,
-      color: color
+      color: color,
+      lineWidth: lineWidth
     });
   }
 
-  function drawLine(x1, y1, x2, y2, color) {
+  function drawLine(x1, y1, x2, y2, color, lineWidth) {
     ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
@@ -198,16 +232,16 @@ function startDrawingApp(roomId) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (const key in allLines) {
       const line = allLines[key];
-      let color = line.color;
+      let colorToDraw = line.color;
+      let widthToDraw = line.lineWidth;
+      
       if (key === selectedLineKey) {
         // Highlight selected line
-        ctx.strokeStyle = 'red';
-        ctx.lineWidth = 4;
-      } else {
-        ctx.strokeStyle = line.color;
-        ctx.lineWidth = 2;
+        colorToDraw = 'red';
+        widthToDraw = 4;
       }
-      drawLine(line.x1, line.y1, line.x2, line.y2, color);
+      
+      drawLine(line.x1, line.y1, line.x2, line.y2, colorToDraw, widthToDraw);
     }
   }
 
@@ -232,7 +266,9 @@ function startDrawingApp(roomId) {
     const coords = getCanvasCoordinates(e);
     lastX = coords.x;
     lastY = coords.y;
-    sendLine(lastX, lastY, lastX, lastY, userColor);
+    const color = currentMode === 'erase' ? '#FFFFFF' : userColor;
+    const lineWidth = currentMode === 'erase' ? 10 : 2; // Erase with a thicker line
+    sendLine(lastX, lastY, lastX, lastY, color, lineWidth);
   }
 
   function stopDrawing() {
@@ -242,7 +278,9 @@ function startDrawingApp(roomId) {
   function draw(e) {
     if (!drawing) return;
     const coords = getCanvasCoordinates(e);
-    sendLine(lastX, lastY, coords.x, coords.y, userColor);
+    const color = currentMode === 'erase' ? '#FFFFFF' : userColor;
+    const lineWidth = currentMode === 'erase' ? 10 : 2;
+    sendLine(lastX, lastY, coords.x, coords.y, color, lineWidth);
     lastX = coords.x;
     lastY = coords.y;
   }
@@ -252,10 +290,9 @@ function startDrawingApp(roomId) {
     let found = false;
     for (const key in allLines) {
       const line = allLines[key];
-      // Simple distance check to see if we clicked near a line segment
-      const dist1 = Math.sqrt(Math.pow(coords.x - line.x1, 2) + Math.pow(coords.y - line.y1, 2));
-      const dist2 = Math.sqrt(Math.pow(coords.x - line.x2, 2) + Math.pow(coords.y - line.y2, 2));
-      if (dist1 < 10 || dist2 < 10) { // 10 is the selection tolerance
+      // A more robust hit-test for lines
+      const dist = distToSegment(coords, {x: line.x1, y: line.y1}, {x: line.x2, y: line.y2});
+      if (dist < 10) { // 10 is the selection tolerance
         selectedLineKey = key;
         deleteBtn.style.display = 'block';
         found = true;
@@ -268,6 +305,19 @@ function startDrawingApp(roomId) {
     }
     redrawCanvas();
   }
+  
+  // A helper function to calculate the distance from a point to a line segment
+  function distToSegment(p, a, b) {
+    const l2 = Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2);
+    if (l2 === 0) return Math.sqrt(Math.pow(p.x - a.x, 2) + Math.pow(p.y - a.y, 2));
+    let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    const projection = {
+      x: a.x + t * (b.x - a.x),
+      y: a.y + t * (b.y - a.y)
+    };
+    return Math.sqrt(Math.pow(p.x - projection.x, 2) + Math.pow(p.y - projection.y, 2));
+  }
 
   // Listen for all lines from Firebase and redraw the canvas
   onValue(roomRef, (snapshot) => {
@@ -275,4 +325,3 @@ function startDrawingApp(roomId) {
     redrawCanvas();
   });
 }
-
