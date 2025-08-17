@@ -40,6 +40,26 @@
     }
     #loginBtn { background-color: #4CAF50; color: white; }
     #registerBtn { background-color: #008CBA; color: white; }
+    
+    #room-selection-container {
+      display: none;
+      padding: 30px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+    #room-selection-container h2 { margin-top: 0; }
+    #createRoomBtn {
+      padding: 15px 30px;
+      font-size: 1.2em;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    
     #canvas-container {
       display: none;
       position: relative;
@@ -100,6 +120,12 @@
     <button id="loginBtn">Login</button>
     <button id="registerBtn">Register</button>
   </div>
+  
+  <div id="room-selection-container">
+    <h2>Welcome to ArtFrenzy!</h2>
+    <button id="createRoomBtn">🎨 Create a New Room</button>
+  </div>
+  
   <div id="canvas-container" style="display: none;">
     <div class="toolbar">
       <label for="color-picker">Color:</label>
