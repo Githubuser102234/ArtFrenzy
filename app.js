@@ -35,6 +35,8 @@ const ctx = canvas.getContext('2d');
 const colorPicker = document.getElementById('color-picker');
 
 let drawing = false;
+let lastX = 0;
+let lastY = 0;
 let userColor = '#000000';
 
 // Event listeners for auth buttons
@@ -134,20 +136,28 @@ function startDrawingApp(roomId) {
     ctx.stroke();
   }
 
-  function getClientCoordinates(e) {
+  function getCanvasCoordinates(e) {
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
     if (e.touches && e.touches.length > 0) {
-      return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
     }
-    return { clientX: e.clientX, clientY: e.clientY };
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
   }
 
   function startDrawing(e) {
     e.preventDefault();
     drawing = true;
-    const { clientX, clientY } = getClientCoordinates(e);
-    const lastX = clientX;
-    const lastY = clientY;
-    sendLine(lastX, lastY, clientX, clientY, userColor);
+    const coords = getCanvasCoordinates(e);
+    lastX = coords.x;
+    lastY = coords.y;
   }
 
   function stopDrawing() {
@@ -157,10 +167,10 @@ function startDrawingApp(roomId) {
   function draw(e) {
     e.preventDefault();
     if (!drawing) return;
-    const { clientX, clientY } = getClientCoordinates(e);
-    const lastX = e.offsetX - (e.movementX || 0);
-    const lastY = e.offsetY - (e.movementY || 0);
-    sendLine(lastX, lastY, clientX, clientY, userColor);
+    const coords = getCanvasCoordinates(e);
+    sendLine(lastX, lastY, coords.x, coords.y, userColor);
+    lastX = coords.x;
+    lastY = coords.y;
   }
 
   // Listen for new lines from Firebase
