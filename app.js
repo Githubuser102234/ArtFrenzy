@@ -286,16 +286,14 @@ function startDrawingApp(roomId) {
 
       if (key === selectedItemKey) {
         colorToDraw = 'red';
-        // Double the line width for highlighting
         if (item.type === 'line') {
-          widthToDraw = item.lineWidth * 2;
+          widthToDraw = item.lineWidth + 2; // Increase width for highlighting
         }
       }
 
       if (item.type === 'line') {
         drawLine(item.x1, item.y1, item.x2, item.y2, colorToDraw, widthToDraw);
       } else if (item.type === 'text') {
-        // Draw selection box if selected
         if (key === selectedItemKey) {
           ctx.strokeStyle = 'red';
           ctx.lineWidth = 2;
@@ -328,7 +326,7 @@ function startDrawingApp(roomId) {
     lastX = coords.x;
     lastY = coords.y;
     const color = currentMode === 'erase' ? '#FFFFFF' : userColor;
-    const lineWidth = 5;
+    const lineWidth = currentMode === 'erase' ? 10 : 2; // Erase with a thicker line
     sendLine(lastX, lastY, lastX, lastY, color, lineWidth);
   }
 
@@ -340,7 +338,7 @@ function startDrawingApp(roomId) {
     if (!drawing) return;
     const coords = getCanvasCoordinates(e);
     const color = currentMode === 'erase' ? '#FFFFFF' : userColor;
-    const lineWidth = 5;
+    const lineWidth = currentMode === 'erase' ? 10 : 2;
     sendLine(lastX, lastY, coords.x, coords.y, color, lineWidth);
     lastX = coords.x;
     lastY = coords.y;
@@ -349,7 +347,7 @@ function startDrawingApp(roomId) {
   function addText(e) {
     const coords = getCanvasCoordinates(e);
     textInput.style.left = `${coords.x}px`;
-    textInput.style.top = `${coords.y - 15}px`; // Adjust position to be centered
+    textInput.style.top = `${coords.y - 15}px`;
     textInput.xPos = coords.x;
     textInput.yPos = coords.y;
     textInput.style.display = 'block';
@@ -359,6 +357,9 @@ function startDrawingApp(roomId) {
   function selectItem(e) {
     const coords = getCanvasCoordinates(e);
     let found = false;
+    textInput.style.display = 'none'; // Hide input on new selection
+    selectedItemKey = null;
+
     for (const key in allItems) {
       const item = allItems[key];
       if (item.type === 'line') {
@@ -371,11 +372,9 @@ function startDrawingApp(roomId) {
         }
       } else if (item.type === 'text') {
         const textWidth = ctx.measureText(item.text).width;
-        // Check if click is inside text bounding box
         if (coords.x >= item.x && coords.x <= item.x + textWidth && coords.y >= item.y - 20 && coords.y <= item.y) {
           selectedItemKey = key;
           deleteBtn.style.display = 'block';
-          // Show and populate text input for editing
           textInput.style.left = `${item.x}px`;
           textInput.style.top = `${item.y - 15}px`;
           textInput.xPos = item.x;
@@ -389,9 +388,8 @@ function startDrawingApp(roomId) {
       }
     }
     if (!found) {
-      selectedItemKey = null;
       deleteBtn.style.display = 'none';
-      textInput.style.display = 'none';
+      selectedItemKey = null;
     }
     redrawCanvas();
   }
