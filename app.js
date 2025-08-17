@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { getDatabase, ref, push, onChildAdded, onValue, remove } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+import { getDatabase, ref, push, onChildAdded, onValue, remove, update } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -32,12 +32,14 @@ const exitRoomBtn = document.getElementById('exitRoomBtn');
 const drawModeBtn = document.getElementById('drawModeBtn');
 const eraseModeBtn = document.getElementById('eraseModeBtn');
 const selectModeBtn = document.getElementById('selectModeBtn');
+const addTextModeBtn = document.getElementById('addTextModeBtn');
 const deleteBtn = document.getElementById('deleteBtn');
 
 const canvasContainer = document.getElementById('canvas-container');
 const canvas = document.getElementById('drawCanvas');
 const ctx = canvas.getContext('2d');
 const colorPicker = document.getElementById('color-picker');
+const textInput = document.getElementById('textInput');
 
 let drawing = false;
 let lastX = 0;
@@ -45,8 +47,8 @@ let lastY = 0;
 let userColor = '#000000';
 let currentMode = 'draw';
 let roomRef;
-let allLines = {};
-let selectedLineKey = null;
+let allItems = {};
+let selectedItemKey = null;
 
 // Event listeners for auth buttons
 loginBtn.addEventListener('click', () => {
@@ -68,7 +70,6 @@ signOutBtn.addEventListener('click', () => {
 });
 
 exitRoomBtn.addEventListener('click', () => {
-  // Redirect to the main page without the room ID
   window.location.href = window.location.origin + window.location.pathname;
 });
 
@@ -84,32 +85,67 @@ createRoomBtn.addEventListener('click', () => {
 drawModeBtn.addEventListener('click', () => {
   currentMode = 'draw';
   toggleModeButtons('draw');
-  selectedLineKey = null;
+  selectedItemKey = null;
+  textInput.style.display = 'none';
   redrawCanvas();
 });
 
 eraseModeBtn.addEventListener('click', () => {
   currentMode = 'erase';
   toggleModeButtons('erase');
-  selectedLineKey = null;
+  selectedItemKey = null;
+  textInput.style.display = 'none';
   redrawCanvas();
 });
 
 selectModeBtn.addEventListener('click', () => {
   currentMode = 'select';
   toggleModeButtons('select');
+  textInput.style.display = 'none';
+});
+
+addTextModeBtn.addEventListener('click', () => {
+  currentMode = 'text';
+  toggleModeButtons('text');
+  selectedItemKey = null;
 });
 
 deleteBtn.addEventListener('click', () => {
-  if (selectedLineKey) {
-    const lineToDeleteRef = ref(database, 'rooms/' + roomRef.key + '/' + selectedLineKey);
-    remove(lineToDeleteRef).then(() => {
-      console.log("Line deleted successfully.");
-      selectedLineKey = null;
+  if (selectedItemKey) {
+    const itemToDeleteRef = ref(database, 'rooms/' + roomRef.key + '/' + selectedItemKey);
+    remove(itemToDeleteRef).then(() => {
+      console.log("Item deleted successfully.");
+      selectedItemKey = null;
       deleteBtn.style.display = 'none';
     }).catch((error) => {
-      console.error("Error removing line: ", error);
+      console.error("Error removing item: ", error);
     });
+  }
+});
+
+textInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const text = textInput.value;
+    if (text) {
+      if (selectedItemKey) {
+        // Update existing text item
+        const updates = {
+          text: text
+        };
+        update(ref(database, 'rooms/' + roomRef.key + '/' + selectedItemKey), updates);
+      } else {
+        // Add new text item
+        push(roomRef, {
+          type: 'text',
+          x: textInput.xPos,
+          y: textInput.yPos,
+          text: text,
+          color: userColor
+        });
+      }
+      textInput.value = '';
+      textInput.style.display = 'none';
+    }
   }
 });
 
@@ -119,7 +155,7 @@ colorPicker.addEventListener('change', (e) => {
 });
 
 function toggleModeButtons(activeMode) {
-  const buttons = [drawModeBtn, eraseModeBtn, selectModeBtn];
+  const buttons = [drawModeBtn, eraseModeBtn, selectModeBtn, addTextModeBtn];
   buttons.forEach(btn => btn.classList.remove('active'));
   
   if (activeMode === 'draw') {
@@ -132,7 +168,12 @@ function toggleModeButtons(activeMode) {
     canvas.style.cursor = 'crosshair';
   } else if (activeMode === 'select') {
     selectModeBtn.classList.add('active');
+    deleteBtn.style.display = 'none';
     canvas.style.cursor = 'pointer';
+  } else if (activeMode === 'text') {
+    addTextModeBtn.classList.add('active');
+    deleteBtn.style.display = 'none';
+    canvas.style.cursor = 'text';
   }
 }
 
@@ -173,7 +214,6 @@ function startDrawingApp(roomId) {
 
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.lineWidth = 2;
 
   canvas.addEventListener('mousedown', handleInteractionStart);
   canvas.addEventListener('mouseup', handleInteractionEnd);
@@ -191,7 +231,9 @@ function startDrawingApp(roomId) {
     if (currentMode === 'draw' || currentMode === 'erase') {
       startDrawing(e);
     } else if (currentMode === 'select') {
-      selectLine(e);
+      selectItem(e);
+    } else if (currentMode === 'text') {
+      addText(e);
     }
   }
 
@@ -210,6 +252,7 @@ function startDrawingApp(roomId) {
   
   function sendLine(x1, y1, x2, y2, color, lineWidth) {
     push(roomRef, {
+      type: 'line',
       x1: x1,
       y1: y1,
       x2: x2,
@@ -228,20 +271,38 @@ function startDrawingApp(roomId) {
     ctx.stroke();
   }
   
+  function drawText(x, y, text, color) {
+    ctx.fillStyle = color;
+    ctx.font = '20px Arial';
+    ctx.fillText(text, x, y);
+  }
+  
   function redrawCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (const key in allLines) {
-      const line = allLines[key];
-      let colorToDraw = line.color;
-      let widthToDraw = line.lineWidth;
-      
-      if (key === selectedLineKey) {
-        // Highlight selected line
+    for (const key in allItems) {
+      const item = allItems[key];
+      let colorToDraw = item.color;
+      let widthToDraw = item.lineWidth;
+
+      if (key === selectedItemKey) {
         colorToDraw = 'red';
-        widthToDraw = 4;
+        // Double the line width for highlighting
+        if (item.type === 'line') {
+          widthToDraw = item.lineWidth * 2;
+        }
       }
-      
-      drawLine(line.x1, line.y1, line.x2, line.y2, colorToDraw, widthToDraw);
+
+      if (item.type === 'line') {
+        drawLine(item.x1, item.y1, item.x2, item.y2, colorToDraw, widthToDraw);
+      } else if (item.type === 'text') {
+        // Draw selection box if selected
+        if (key === selectedItemKey) {
+          ctx.strokeStyle = 'red';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(item.x - 5, item.y - 25, ctx.measureText(item.text).width + 10, 35);
+        }
+        drawText(item.x, item.y, item.text, colorToDraw);
+      }
     }
   }
 
@@ -267,7 +328,7 @@ function startDrawingApp(roomId) {
     lastX = coords.x;
     lastY = coords.y;
     const color = currentMode === 'erase' ? '#FFFFFF' : userColor;
-    const lineWidth = currentMode === 'erase' ? 10 : 2; // Erase with a thicker line
+    const lineWidth = 5;
     sendLine(lastX, lastY, lastX, lastY, color, lineWidth);
   }
 
@@ -279,29 +340,58 @@ function startDrawingApp(roomId) {
     if (!drawing) return;
     const coords = getCanvasCoordinates(e);
     const color = currentMode === 'erase' ? '#FFFFFF' : userColor;
-    const lineWidth = currentMode === 'erase' ? 10 : 2;
+    const lineWidth = 5;
     sendLine(lastX, lastY, coords.x, coords.y, color, lineWidth);
     lastX = coords.x;
     lastY = coords.y;
   }
+  
+  function addText(e) {
+    const coords = getCanvasCoordinates(e);
+    textInput.style.left = `${coords.x}px`;
+    textInput.style.top = `${coords.y - 15}px`; // Adjust position to be centered
+    textInput.xPos = coords.x;
+    textInput.yPos = coords.y;
+    textInput.style.display = 'block';
+    textInput.focus();
+  }
 
-  function selectLine(e) {
+  function selectItem(e) {
     const coords = getCanvasCoordinates(e);
     let found = false;
-    for (const key in allLines) {
-      const line = allLines[key];
-      // A more robust hit-test for lines
-      const dist = distToSegment(coords, {x: line.x1, y: line.y1}, {x: line.x2, y: line.y2});
-      if (dist < 10) { // 10 is the selection tolerance
-        selectedLineKey = key;
-        deleteBtn.style.display = 'block';
-        found = true;
-        break;
+    for (const key in allItems) {
+      const item = allItems[key];
+      if (item.type === 'line') {
+        const dist = distToSegment(coords, {x: item.x1, y: item.y1}, {x: item.x2, y: item.y2});
+        if (dist < 10) {
+          selectedItemKey = key;
+          deleteBtn.style.display = 'block';
+          found = true;
+          break;
+        }
+      } else if (item.type === 'text') {
+        const textWidth = ctx.measureText(item.text).width;
+        // Check if click is inside text bounding box
+        if (coords.x >= item.x && coords.x <= item.x + textWidth && coords.y >= item.y - 20 && coords.y <= item.y) {
+          selectedItemKey = key;
+          deleteBtn.style.display = 'block';
+          // Show and populate text input for editing
+          textInput.style.left = `${item.x}px`;
+          textInput.style.top = `${item.y - 15}px`;
+          textInput.xPos = item.x;
+          textInput.yPos = item.y;
+          textInput.value = item.text;
+          textInput.style.display = 'block';
+          textInput.focus();
+          found = true;
+          break;
+        }
       }
     }
     if (!found) {
-      selectedLineKey = null;
+      selectedItemKey = null;
       deleteBtn.style.display = 'none';
+      textInput.style.display = 'none';
     }
     redrawCanvas();
   }
@@ -319,9 +409,9 @@ function startDrawingApp(roomId) {
     return Math.sqrt(Math.pow(p.x - projection.x, 2) + Math.pow(p.y - projection.y, 2));
   }
 
-  // Listen for all lines from Firebase and redraw the canvas
+  // Listen for all items from Firebase and redraw the canvas
   onValue(roomRef, (snapshot) => {
-    allLines = snapshot.val() || {};
+    allItems = snapshot.val() || {};
     redrawCanvas();
   });
 }
