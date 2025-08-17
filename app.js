@@ -21,10 +21,12 @@ const auth = getAuth(app);
 const database = getDatabase(app);
 
 const authContainer = document.getElementById('auth-container');
+const roomSelectionContainer = document.getElementById('room-selection-container');
 const emailInput = document.getElementById('email');
 const passwordInput = document.getElementById('password');
 const loginBtn = document.getElementById('loginBtn');
 const registerBtn = document.getElementById('registerBtn');
+const createRoomBtn = document.getElementById('createRoomBtn');
 const signOutBtn = document.getElementById('signOutBtn');
 
 const canvasContainer = document.getElementById('canvas-container');
@@ -54,6 +56,14 @@ signOutBtn.addEventListener('click', () => {
   signOut(auth);
 });
 
+// Event listener for the new "Create Room" button
+createRoomBtn.addEventListener('click', () => {
+  const newRoomId = Math.random().toString(36).substring(2, 9);
+  const currentUrl = new URL(window.location.href);
+  const newUrl = `${currentUrl.origin}${currentUrl.pathname}?roomid=${newRoomId}`;
+  window.location.href = newUrl;
+});
+
 // Update the user's color when the color picker changes
 colorPicker.addEventListener('change', (e) => {
   userColor = e.target.value;
@@ -63,39 +73,43 @@ colorPicker.addEventListener('change', (e) => {
 onAuthStateChanged(auth, user => {
   if (user) {
     authContainer.style.display = 'none';
-    canvasContainer.style.display = 'block';
     signOutBtn.style.display = 'block';
-    startDrawingApp();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('roomid');
+
+    if (roomId) {
+      roomSelectionContainer.style.display = 'none';
+      canvasContainer.style.display = 'block';
+      startDrawingApp(roomId);
+    } else {
+      roomSelectionContainer.style.display = 'flex';
+      canvasContainer.style.display = 'none';
+    }
   } else {
     authContainer.style.display = 'flex';
+    roomSelectionContainer.style.display = 'none';
     canvasContainer.style.display = 'none';
     signOutBtn.style.display = 'none';
   }
 });
 
 // The drawing app logic
-function startDrawingApp() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const roomId = urlParams.get('roomid');
-
-  // Redirection Logic
-  const githubPageUrl = 'https://githubuser102234.github.io/ArtFrenzy/';
-  if (!roomId) {
-    const newRoomId = Math.random().toString(36).substring(2, 9);
-    window.location.href = `${githubPageUrl}?roomid=${newRoomId}`;
-    return;
-  }
-  
+function startDrawingApp(roomId) {
   const roomRef = ref(database, 'rooms/' + roomId);
 
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 2;
+
   canvas.addEventListener('mousedown', startDrawing);
   canvas.addEventListener('mouseup', stopDrawing);
-  canvas.addEventListener('mouseout', stopDrawing); // Stop drawing if mouse leaves canvas
+  canvas.addEventListener('mouseout', stopDrawing);
   canvas.addEventListener('mousemove', draw);
-  
+
   // Mobile touch events
   canvas.addEventListener('touchstart', startDrawing);
   canvas.addEventListener('touchend', stopDrawing);
@@ -128,10 +142,12 @@ function startDrawingApp() {
   }
 
   function startDrawing(e) {
-    e.preventDefault(); // Prevents mobile scrolling while drawing
+    e.preventDefault();
     drawing = true;
     const { clientX, clientY } = getClientCoordinates(e);
-    drawLine(clientX, clientY, clientX, clientY, userColor);
+    const lastX = clientX;
+    const lastY = clientY;
+    sendLine(lastX, lastY, clientX, clientY, userColor);
   }
 
   function stopDrawing() {
@@ -142,12 +158,11 @@ function startDrawingApp() {
     e.preventDefault();
     if (!drawing) return;
     const { clientX, clientY } = getClientCoordinates(e);
-    const lastX = e.offsetX - (e.movementX || 0); // movementX is not available on touch events
+    const lastX = e.offsetX - (e.movementX || 0);
     const lastY = e.offsetY - (e.movementY || 0);
     sendLine(lastX, lastY, clientX, clientY, userColor);
-    drawLine(lastX, lastY, clientX, clientY, userColor);
   }
-  
+
   // Listen for new lines from Firebase
   onChildAdded(roomRef, snapshot => {
     const line = snapshot.val();
