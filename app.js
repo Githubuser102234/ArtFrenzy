@@ -158,6 +158,9 @@ function startDrawingApp(roomId) {
     const coords = getCanvasCoordinates(e);
     lastX = coords.x;
     lastY = coords.y;
+    // Draw an initial dot on mouse down
+    drawLine(lastX, lastY, lastX, lastY, userColor);
+    sendLine(lastX, lastY, lastX, lastY, userColor);
   }
 
   function stopDrawing() {
@@ -168,7 +171,11 @@ function startDrawingApp(roomId) {
     e.preventDefault();
     if (!drawing) return;
     const coords = getCanvasCoordinates(e);
+    // Draw the line on the canvas immediately for a responsive feel
+    drawLine(lastX, lastY, coords.x, coords.y, userColor);
+    // Send the line data to Firebase
     sendLine(lastX, lastY, coords.x, coords.y, userColor);
+    // Update the last position
     lastX = coords.x;
     lastY = coords.y;
   }
@@ -176,6 +183,7 @@ function startDrawingApp(roomId) {
   // Listen for new lines from Firebase
   onChildAdded(roomRef, snapshot => {
     const line = snapshot.val();
+    // This is the key part - we draw the line using the received data
     drawLine(line.x1, line.y1, line.x2, line.y2, line.color);
   });
 }
