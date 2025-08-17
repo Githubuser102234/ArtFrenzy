@@ -25,6 +25,10 @@
       width: 90%;
       max-width: 400px;
       box-sizing: border-box;
+      /* Ensure vertical layout for fields and buttons */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     #auth-container h2, #room-selection-container h2 {
       margin-top: 0;
@@ -210,7 +214,6 @@
       </div>
       <div class="top-right-buttons">
         <button id="exitRoomBtn" class="action-btn">Exit Room</button>
-        <button id="signOutBtn" class="action-btn">Sign Out</button>
       </div>
     </div>
     <canvas id="drawCanvas"></canvas>
