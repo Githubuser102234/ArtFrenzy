@@ -189,16 +189,23 @@ onAuthStateChanged(auth, user => {
       roomSelectionContainer.style.display = 'none';
       canvasContainer.style.display = 'block';
       exitRoomBtn.style.display = 'block';
+      // Hide the sign-out button on the room selection page
+      document.querySelector('#room-selection-container #signOutBtn').style.display = 'none';
+      startDrawingApp(roomId);
     } else {
       roomSelectionContainer.style.display = 'flex';
       canvasContainer.style.display = 'none';
       exitRoomBtn.style.display = 'none';
+      // Show the sign-out button on the room selection page
+      document.querySelector('#room-selection-container #signOutBtn').style.display = 'block';
     }
   } else {
     authContainer.style.display = 'flex';
     roomSelectionContainer.style.display = 'none';
     canvasContainer.style.display = 'none';
     exitRoomBtn.style.display = 'none';
+    // Hide the sign-out button on the room selection page
+    document.querySelector('#room-selection-container #signOutBtn').style.display = 'none';
   }
 });
 
