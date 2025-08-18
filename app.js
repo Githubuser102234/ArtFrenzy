@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { getDatabase, ref, push, onChildAdded, onValue, remove, update } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -90,8 +90,10 @@ drawModeBtn.addEventListener('click', () => {
   redrawCanvas();
 });
 
+// The erase mode is now a 'visual' tool that uses the select/delete functionality.
+// The button will now visually activate the "select" mode.
 eraseModeBtn.addEventListener('click', () => {
-  currentMode = 'erase';
+  currentMode = 'select'; // Switch to select mode for deleting
   toggleModeButtons('erase');
   selectedItemKey = null;
   textInput.style.display = 'none';
@@ -112,11 +114,12 @@ addTextModeBtn.addEventListener('click', () => {
 
 deleteBtn.addEventListener('click', () => {
   if (selectedItemKey) {
-    const itemToDeleteRef = ref(database, 'rooms/' + roomRef.key + '/' + selectedItemKey);
+    const itemToDeleteRef = ref(database, 'rooms/' + getRoomId() + '/' + selectedItemKey);
     remove(itemToDeleteRef).then(() => {
       console.log("Item deleted successfully.");
       selectedItemKey = null;
       deleteBtn.style.display = 'none';
+      redrawCanvas();
     }).catch((error) => {
       console.error("Error removing item: ", error);
     });
@@ -132,7 +135,7 @@ textInput.addEventListener('keydown', (e) => {
         const updates = {
           text: text
         };
-        update(ref(database, 'rooms/' + roomRef.key + '/' + selectedItemKey), updates);
+        update(ref(database, 'rooms/' + getRoomId() + '/' + selectedItemKey), updates);
       } else {
         // Add new text item
         push(roomRef, {
@@ -158,23 +161,27 @@ function toggleModeButtons(activeMode) {
   const buttons = [drawModeBtn, eraseModeBtn, selectModeBtn, addTextModeBtn];
   buttons.forEach(btn => btn.classList.remove('active'));
   
+  // A slight change here: The 'erase' button will activate the 'select' mode logically.
   if (activeMode === 'draw') {
     drawModeBtn.classList.add('active');
-    deleteBtn.style.display = 'none';
     canvas.style.cursor = 'crosshair';
   } else if (activeMode === 'erase') {
     eraseModeBtn.classList.add('active');
-    deleteBtn.style.display = 'none';
-    canvas.style.cursor = 'crosshair';
+    canvas.style.cursor = 'pointer'; // Use pointer to indicate selection
   } else if (activeMode === 'select') {
     selectModeBtn.classList.add('active');
-    deleteBtn.style.display = 'none';
     canvas.style.cursor = 'pointer';
   } else if (activeMode === 'text') {
     addTextModeBtn.classList.add('active');
-    deleteBtn.style.display = 'none';
     canvas.style.cursor = 'text';
   }
+  
+  deleteBtn.style.display = 'none';
+}
+
+function getRoomId() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('roomid');
 }
 
 // Main logic for handling authentication state changes
@@ -182,13 +189,13 @@ onAuthStateChanged(auth, user => {
   if (user) {
     authContainer.style.display = 'none';
     
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomId = urlParams.get('roomid');
+    const roomId = getRoomId();
 
     if (roomId) {
       roomSelectionContainer.style.display = 'none';
       canvasContainer.style.display = 'block';
       exitRoomBtn.style.display = 'block';
+      startDrawingApp(roomId);
     } else {
       roomSelectionContainer.style.display = 'flex';
       canvasContainer.style.display = 'none';
@@ -206,8 +213,16 @@ onAuthStateChanged(auth, user => {
 function startDrawingApp(roomId) {
   roomRef = ref(database, 'rooms/' + roomId);
 
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  function setCanvasSize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      redrawCanvas();
+  }
+  
+  setCanvasSize();
+
+  // Add event listener for window resizing
+  window.addEventListener('resize', setCanvasSize);
 
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -225,7 +240,7 @@ function startDrawingApp(roomId) {
 
   function handleInteractionStart(e) {
     e.preventDefault();
-    if (currentMode === 'draw' || currentMode === 'erase') {
+    if (currentMode === 'draw') {
       startDrawing(e);
     } else if (currentMode === 'select') {
       selectItem(e);
@@ -235,14 +250,14 @@ function startDrawingApp(roomId) {
   }
 
   function handleInteractionEnd(e) {
-    if (currentMode === 'draw' || currentMode === 'erase') {
+    if (currentMode === 'draw') {
       stopDrawing();
     }
   }
 
   function handleInteractionMove(e) {
     e.preventDefault();
-    if (currentMode === 'draw' || currentMode === 'erase') {
+    if (currentMode === 'draw') {
       draw(e);
     }
   }
@@ -322,8 +337,8 @@ function startDrawingApp(roomId) {
     const coords = getCanvasCoordinates(e);
     lastX = coords.x;
     lastY = coords.y;
-    const color = currentMode === 'erase' ? '#FFFFFF' : userColor;
-    const lineWidth = currentMode === 'erase' ? 10 : 2; // Erase with a thicker line
+    const color = userColor;
+    const lineWidth = 2;
     sendLine(lastX, lastY, lastX, lastY, color, lineWidth);
   }
 
@@ -334,8 +349,8 @@ function startDrawingApp(roomId) {
   function draw(e) {
     if (!drawing) return;
     const coords = getCanvasCoordinates(e);
-    const color = currentMode === 'erase' ? '#FFFFFF' : userColor;
-    const lineWidth = currentMode === 'erase' ? 10 : 2;
+    const color = userColor;
+    const lineWidth = 2;
     sendLine(lastX, lastY, coords.x, coords.y, color, lineWidth);
     lastX = coords.x;
     lastY = coords.y;
@@ -354,39 +369,45 @@ function startDrawingApp(roomId) {
   function selectItem(e) {
     const coords = getCanvasCoordinates(e);
     let found = false;
-    textInput.style.display = 'none'; // Hide input on new selection
+    textInput.style.display = 'none';
     selectedItemKey = null;
 
-    for (const key in allItems) {
-      const item = allItems[key];
-      if (item.type === 'line') {
-        const dist = distToSegment(coords, {x: item.x1, y: item.y1}, {x: item.x2, y: item.y2});
-        if (dist < 10) {
-          selectedItemKey = key;
-          deleteBtn.style.display = 'block';
-          found = true;
-          break;
+    // Check for an item in reverse order to select the top-most item
+    const keys = Object.keys(allItems);
+    for (let i = keys.length - 1; i >= 0; i--) {
+        const key = keys[i];
+        const item = allItems[key];
+        if (item.type === 'line') {
+            const dist = distToSegment(coords, {x: item.x1, y: item.y1}, {x: item.x2, y: item.y2});
+            if (dist < 10) {
+                selectedItemKey = key;
+                deleteBtn.style.display = 'block';
+                found = true;
+                break;
+            }
+        } else if (item.type === 'text') {
+            const tempCtx = canvas.getContext('2d');
+            tempCtx.font = '20px Arial';
+            const textWidth = tempCtx.measureText(item.text).width;
+            if (coords.x >= item.x && coords.x <= item.x + textWidth && coords.y >= item.y - 20 && coords.y <= item.y) {
+                selectedItemKey = key;
+                deleteBtn.style.display = 'block';
+                textInput.style.left = `${item.x}px`;
+                textInput.style.top = `${item.y - 15}px`;
+                textInput.xPos = item.x;
+                textInput.yPos = item.y;
+                textInput.value = item.text;
+                textInput.style.display = 'block';
+                textInput.focus();
+                found = true;
+                break;
+            }
         }
-      } else if (item.type === 'text') {
-        const textWidth = ctx.measureText(item.text).width;
-        if (coords.x >= item.x && coords.x <= item.x + textWidth && coords.y >= item.y - 20 && coords.y <= item.y) {
-          selectedItemKey = key;
-          deleteBtn.style.display = 'block';
-          textInput.style.left = `${item.x}px`;
-          textInput.style.top = `${item.y - 15}px`;
-          textInput.xPos = item.x;
-          textInput.yPos = item.y;
-          textInput.value = item.text;
-          textInput.style.display = 'block';
-          textInput.focus();
-          found = true;
-          break;
-        }
-      }
     }
+
     if (!found) {
-      deleteBtn.style.display = 'none';
-      selectedItemKey = null;
+        deleteBtn.style.display = 'none';
+        selectedItemKey = null;
     }
     redrawCanvas();
   }
